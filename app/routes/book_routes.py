@@ -1,28 +1,39 @@
-from flask import Blueprint
-from app.models.book import books
+from flask import Blueprint, request, Response
+from app.models.book import Book
+from .route_utilities import validate_model, create_model, get_models_with_filters
+from ..db import db
 
-books_bp = Blueprint("books_bp", __name__, url_prefix="/books")
+bp = Blueprint("books_bp", __name__, url_prefix="/books")
 
-@books_bp.get("")
+@bp.post("")
+def create_book():
+    request_body = request.get_json()
+    return create_model(Book, request_body)
+
+@bp.get("")
 def get_all_books():
-    books_response = []
-    for book in books:
-        books_response.append(
-            {
-                "id": book.id,
-                "title": book.title,
-                "description": book.description
-            }
-        )
-    return books_response
+    return get_models_with_filters(Book, request.args)
 
-@books_bp.get("/<book_id>")
+@bp.get("/<book_id>")
 def get_one_book(book_id):
-    book_id = int(book_id)
-    for book in books:
-        if book.id == book_id:
-            return {
-                "id": book.id,
-                "title": book.title,
-                "description": book.description,
-            }
+    book = validate_model(Book, book_id)
+    return book.to_dict()
+
+@bp.put("/<book_id>")
+def update_book(book_id):
+    book = validate_model(Book, book_id)
+    request_body = request.get_json()
+
+    book.title = request_body["title"]
+    book.description = request_body["description"]
+    db.session.commit()
+
+    return Response(status=204, mimetype="application/json") # 204 No Content
+
+@bp.delete("/<book_id>")
+def delete_book(book_id):
+    book = validate_model(Book, book_id)
+    db.session.delete(book)
+    db.session.commit()
+
+    return Response(status=204, mimetype="application/json")
